@@ -1,4 +1,3 @@
-
 #include <WiFi.h>
 #include <ModbusMaster.h>
 #include <HardwareSerial.h>
@@ -23,6 +22,11 @@ PubSubClient client(espClient);
 // Časovna kontrola
 unsigned long lastRead = 0;
 const unsigned long interval = 5000;
+
+// --- Globalne spremenljivke za histerezo ---
+#define POWER_LIMIT_HIGH 5800  // če presežemo to vrednost, omejimo
+#define POWER_LIMIT_LOW  5500  // ko pademo pod to, vrnemo na 100%
+bool powerLimited = false;     // stanje omejitve moči
 
 void callback(char* topic, byte* payload, unsigned int length) {
   String messageTemp;
@@ -64,7 +68,6 @@ void setup() {
   RS485Serial.begin(9600, SERIAL_8N1, RXD2, TXD2);
   node.begin(1, RS485Serial);
 
-  WiFi.begin(ssid, password);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
@@ -77,7 +80,7 @@ void loop() {
   client.loop();
 
   unsigned long now = millis();
-  if (now - lastRead > 5000) {
+  if (now - lastRead > interval) {
     lastRead = now;
 
     uint8_t result = node.readInputRegisters(35105, 2);
@@ -87,10 +90,14 @@ void loop() {
       sprintf(msg, "{\"ac_power\": %ld}", acPower);
       client.publish("qb/inverter/status", msg);
 
-      if (acPower > 3000) {
-        node.writeSingleRegister(37113, 50); // limit to 50%
-      } else {
-        node.writeSingleRegister(37113, 100); // restore to 100%
+      // --- Logika za omejevanje izhodne moči inverterja ---
+      if (!powerLimited && acPower > POWER_LIMIT_HIGH) {
+        node.writeSingleRegister(37113, 50);  // omeji moč na 50 %
+        powerLimited = true;
+      }
+      else if (powerLimited && acPower < POWER_LIMIT_LOW) {
+        node.writeSingleRegister(37113, 100); // vrni moč na 100 %
+        powerLimited = false;
       }
     }
   }
