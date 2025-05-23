@@ -1,0 +1,8 @@
+build/
+*.bak
+*.log
+*.tmp
+.vscode/
+*.pyc
+.DS_Store
+.idea/
