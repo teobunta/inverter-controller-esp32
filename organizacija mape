@@ -1,0 +1,17 @@
+inverter-controller-esp32/
+│
+├── src/                     ← izvorna koda (če bo več datotek)
+│   └── inverter_controller_esp32.ino
+│
+├── include/                 ← za dodatne .h (header) datoteke
+│
+├── lib/                     ← zunanje knjižnice (če jih ročno dodaš)
+│
+├── data/                    ← podatki za SPIFFS ali LittleFS
+│
+├── test/                    ← enote testov (če jih boš uporabljal)
+│
+├── .gitignore               ← izključi build/ ipd. iz GitHub
+├── README.md                ← opis projekta (obvezno)
+├── platformio.ini           ← če uporabljaš PlatformIO
+└── LICENSE                  ← licenca (npr. MIT, Apache 2.0, GPL...)
