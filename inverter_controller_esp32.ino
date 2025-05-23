@@ -23,10 +23,11 @@ PubSubClient client(espClient);
 unsigned long lastRead = 0;
 const unsigned long interval = 5000;
 
-// --- Globalne spremenljivke za histerezo ---
-#define POWER_LIMIT_HIGH 5800  // če presežemo to vrednost, omejimo
-#define POWER_LIMIT_LOW  5500  // ko pademo pod to, vrnemo na 100%
-bool powerLimited = false;     // stanje omejitve moči
+// --- Histereza in statistika ---
+#define POWER_LIMIT_HIGH 5800
+#define POWER_LIMIT_LOW  5500
+bool powerLimited = false;
+unsigned long limitCount = 0;
 
 void callback(char* topic, byte* payload, unsigned int length) {
   String messageTemp;
@@ -86,18 +87,25 @@ void loop() {
     uint8_t result = node.readInputRegisters(35105, 2);
     if (result == node.ku8MBSuccess) {
       long acPower = ((uint32_t)node.getResponseBuffer(0) << 16) | node.getResponseBuffer(1);
-      char msg[100];
-      sprintf(msg, "{\"ac_power\": %ld}", acPower);
+
+      // Objavi osnovne podatke
+      char msg[128];
+      sprintf(msg, "{\"ac_power\": %ld, \"limit_count\": %lu}", acPower, limitCount);
       client.publish("qb/inverter/status", msg);
 
-      // --- Logika za omejevanje izhodne moči inverterja ---
+      // Logika za omejevanje moči z MQTT obvestilom
       if (!powerLimited && acPower > POWER_LIMIT_HIGH) {
-        node.writeSingleRegister(37113, 50);  // omeji moč na 50 %
+        node.writeSingleRegister(37113, 50);
         powerLimited = true;
+        limitCount++;
+
+        client.publish("qb/inverter/event", "Power limited to 50%");
       }
       else if (powerLimited && acPower < POWER_LIMIT_LOW) {
-        node.writeSingleRegister(37113, 100); // vrni moč na 100 %
+        node.writeSingleRegister(37113, 100);
         powerLimited = false;
+
+        client.publish("qb/inverter/event", "Power limit removed, set to 100%");
       }
     }
   }
